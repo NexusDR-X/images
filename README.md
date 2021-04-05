@@ -118,7 +118,7 @@ __*PLEASE* DO THESE STEPS before seeking help!__
 
 1. Connect your Pi's ethernet port to your home network or use the Pi's wifi to connect to your home network.  For WiFi:
 	- Click on the network icon (just to the left of the speaker icon) on the Pi's top menu bar.  
-	- Select your WiFi network from the list (NOTE: it make take a minute or 3 for the WiFi networks your Pi can see to appear in that list) and follow the instructions on the screen.
+	- Select your WiFi network from the list (NOTE: it takes take a minute or 3 for the WiFi networks your Pi can see to appear in that list) and follow the instructions on the screen.
 	
 1. Click __Raspberry > Preferences > Raspberry Pi Configuration__, then click __Change Password__ to set your password.  Click __OK__, and __OK__ again.  
 
