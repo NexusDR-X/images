@@ -1,15 +1,17 @@
 # Nexus DR-X Pi Image
 
-Version 20201212.4
+Version 20201212.5
 
 Author: Steve Magnuson, AG7GN
 
 ## Prerequisites
 
 - Raspberry Pi 3B, 3B+ or 4B.  The 2GB version of the 4B is fine.
-- [Fe-Pi Audio Z Version 2 sound card](https://fe-pi.com/products/fe-pi-audio-z-v2)
-- Budd Churchward's ([WB7FHC](http://wb7fhc.com/index.html)) excellent [Nexus DR-X](http://wb7fhc.com/intro.html) board. The DigiLink is no longer made.
-- 16GB or greater MicroSD card ([a 32GB or larger card is best](https://raspberryinsider.com/what-the-largest-micro-sd-card-supported-the-by-raspberry-pi/)). I've found that the [SanDisk 32GB Extreme PLUS microSDHC](https://www.officedepot.com/a/products/225929/SanDisk-Extreme-PLUS-microSDHC-Memory-Card/) is very fast and reliable. Samsung and SanDisk are among the most reliable cards.
+- Budd Churchward's ([WB7FHC](http://wb7fhc.com/index.html)) excellent [Nexus DR-X kit](http://wb7fhc.com/intro.html) board. The DigiLink is no longer made.
+- Fe-Pi Audio Z Version 2 sound card. (Order it with the [Nexus DR-X kit)](https://fe-pi.com/products/fe-pi-audio-z-v2)
+- 16GB (minimum) MicroSD card ([a 32GB or larger card is best](https://raspberryinsider.com/what-the-largest-micro-sd-card-supported-the-by-raspberry-pi/)). I've found that the [SanDisk 32GB Extreme PLUS microSDHC](https://www.officedepot.com/a/products/225929/SanDisk-Extreme-PLUS-microSDHC-Memory-Card/) is very fast and reliable. Samsung and SanDisk are among the most reliable cards. 
+
+	You will find a link to download the image in the “Installation” instructions below.
 - OPTIONAL: Speakers attached to Pi's built-in audio jack or an HDMI monitor with speakers if you want to monitor the radio's TX and/or RX or use Fldigi's audio alerts feature
 
 This image uses the default configuration for user __pi__:  

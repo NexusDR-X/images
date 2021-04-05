@@ -84,7 +84,7 @@
 #%
 #================================================================
 #- IMPLEMENTATION
-#-    version         ${SCRIPT_NAME} 2.0.3
+#-    version         ${SCRIPT_NAME} 2.0.4
 #-    author          Steve Magnuson, AG7GN
 #-    license         CC-BY-SA Creative Commons License
 #-    script_id       0
@@ -157,7 +157,7 @@ function Die () {
 }
 
 function mailLog () {
-	SUBJECT="$NAME backup status for $(date "+%A, %B %e %Y")"
+	SUBJECT="$NAME backup to $HOSTNAME status for $(date "+%A, %B %e %Y")"
 	MAIL_TYPE="${1^^}"
 	case $MAIL_TYPE in
 		PAT)
