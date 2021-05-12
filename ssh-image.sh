@@ -34,9 +34,9 @@
 #%                                to one or more RECIPIENT email addresses. 
 #%                                Separate each address with a comma. 
 #%    -p PORT, --port=PORT        Connect to HOST using this port. Default:22
-#%    -d DEVICE, --device=DEVICE  The target device to back up. On Pis that boot from a 
+#%    -d DEVICE, --device=DEVICE  The source device to back up. On Pis that boot from a 
 #%                                USB drive, this would be something like /dev/sda.
-#%                                Default is /dev/mmcblk0, which is the Pi's microSD card.
+#%                                Default: /dev/mmcblk0, which is the Pi's microSD card.
 #% 
 #% REQUIREMENTS
 #%    The remote host you are creating an image of (the source) must have the
