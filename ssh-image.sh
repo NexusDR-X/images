@@ -34,6 +34,9 @@
 #%                                to one or more RECIPIENT email addresses. 
 #%                                Separate each address with a comma. 
 #%    -p PORT, --port=PORT        Connect to HOST using this port. Default:22
+#%    -d DEVICE, --device=DEVICE  The target device to back up. On Pis that boot from a 
+#%                                USB drive, this would be something like /dev/sda.
+#%                                Default is /dev/mmcblk0, which is the Pi's microSD card.
 #% 
 #% REQUIREMENTS
 #%    The remote host you are creating an image of (the source) must have the
@@ -84,7 +87,7 @@
 #%
 #================================================================
 #- IMPLEMENTATION
-#-    version         ${SCRIPT_NAME} 2.0.4
+#-    version         ${SCRIPT_NAME} 2.0.5
 #-    author          Steve Magnuson, AG7GN
 #-    license         CC-BY-SA Creative Commons License
 #-    script_id       0
@@ -92,6 +95,8 @@
 #================================================================
 #  HISTORY
 #     20200622 : Steve Magnuson : Script creation
+#     20210512 : Added "device" to enable backup of Pis that boot
+#                from a USB drive 
 # 
 #================================================================
 #  DEBUG OPTION
@@ -351,7 +356,7 @@ TMPDIR="/tmp/${SCRIPT_NAME}.$RANDOM.$RANDOM.$RANDOM.$$"
 #============================
   
 #== set short options ==#
-SCRIPT_OPTS=':n:k:m:p:hv-:'
+SCRIPT_OPTS=':d:k:m:n:p:hv-:'
 
 #== set long options associated with short one ==#
 typeset -A ARRAY_OPTS
@@ -362,6 +367,7 @@ ARRAY_OPTS=(
 	[key]=k
 	[mail]=m
 	[port]=p
+	[device]=d
 )
 
 LONG_OPTS="^($(echo "${!ARRAY_OPTS[@]}" | tr ' ' '|'))="
@@ -422,6 +428,9 @@ do
 		p)
 			PORT="$OPTARG"
 			;;
+		d)
+			DEVICE="$OPTARG"
+			;;
 		:) 
 			Die "${SCRIPT_NAME}: -$OPTARG: option requires an argument"
 			;;
@@ -457,6 +466,7 @@ KEY=${KEY:-$HOME/.ssh/id_rsa}
 PORT=${PORT:-22}
 STOREDIMAGE="$HOME/$NAME.img"
 GZIPIMAGE="$HOME/$NAME-$(date "+%Y%m%dT%H%M").gz"
+DEVICE=${DEVICE:-/dev/mmcblk0}
 RECIPIENTS=${RECIPIENTS:-}
 # Set the SENDER variable to your email address if you want results mailed using a
 # mail program on this host.  This variable is not used if you're using pat.
@@ -497,7 +507,7 @@ $DEBUG && set -x
 # SSH to source (host to back up), and start dd piped into gzip so we don't send so much traffic.
 # When the data stream is received on this host, use dd to capture it into a .gz file
 echo >&2 "$(date): Downloading compressed-on-the-fly dd image from $NAME via ssh into local file $GZIPIMAGE..." >> $LOG
-$SSH "sudo dd if=/dev/mmcblk0 bs=1M 2>/dev/null | gzip - 2>/dev/null" 2>>$LOG | dd of=$GZIPIMAGE status=none 2>&1 >> $LOG
+$SSH "sudo dd if=$DEVICE bs=1M 2>/dev/null | gzip - 2>/dev/null" 2>>$LOG | dd of=$GZIPIMAGE status=none 2>&1 >> $LOG
 (( $? == 0 )) && echo >&2 "$(date): Download complete." >> $LOG || { echo >&2 "$(date): FAILED." >> $LOG; exit 1; }
 
 # Check to see if we have an intact .gz file
