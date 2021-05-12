@@ -5,7 +5,7 @@
 #% SYNOPSIS
 #+   ${SCRIPT_NAME} [-hv] 
 #+   ${SCRIPT_NAME} USER@HOST 
-#+   ${SCRIPT_NAME} [-n NAME] [-k FILE] [-m RECIPIENT[,RECIPIENT]...] [-p PORT] USER@HOST
+#+   ${SCRIPT_NAME} [-d DEVICE] [-n NAME] [-k FILE] [-m RECIPIENT[,RECIPIENT]...] [-p PORT] USER@HOST
 #%
 #% DESCRIPTION
 #%   This script makes a compressed and zipped image file of a remote 
