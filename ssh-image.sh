@@ -37,10 +37,8 @@
 #%    -d DEVICE, --device=DEVICE  The source device to back up. On Pis that boot from a 
 #%                                USB drive, this would be something like /dev/sda.
 #%                                Default: /dev/mmcblk0, which is the Pi's microSD card.
-#%    -s, --shrink                For the default device (/dev/mmcblk0) ONLY, 
-#%                                optionally shrink the root partition before ZIPing the
-#%                                image. This option is ignored if DEVICE is anything
-#%                                other than /dev/mmcblk0.
+#%    -s, --shrink                Optionally shrink the root partition before ZIPing the
+#%                                image. 
 #% 
 #% REQUIREMENTS
 #%    The remote host you are creating an image of (the source) must have the
@@ -52,9 +50,8 @@
 #%    be prompted to enter the passphrase. This script will automatically use 
 #%    $HOME/.keychain/$HOSTNAME-sh if it exists.
 #%
-#%    If the shrink (-s, --shrink) option is specified AND the default device is 
-#%    /dev/mmcblk0 (the Pi's microSD card), then the destination host must have 
-#%    available disk space of twice the size of the source's microSD card.  
+#%    If the shrink (-s, --shrink) option is specified, the destination host must 
+#%    have available disk space of twice the size of the source's microSD card.  
 #%    The majority of the needed disk space is used during the shrinking and 
 #%    truncating process, and that disk space is freed up when the script completes. 
 #%    The resulting ZIP file (.zip extension) is usually considerably smaller than the 
@@ -62,6 +59,10 @@
 #%
 #%    If the shrink (-s, --shrink) option is not provided, the resulting file will be a
 #%    gzip file with a .gz extension.
+#%
+#%    The filename will contain, just before the extension, the original size of the
+#%    device that was backed up in the form *_xGB.zip or *_xGB.gz, where x is the size 
+#%    of the device in GB.
 #%                 
 #%    This script should be run by a regular user, but the user or a group of 
 #%    which the user is a member must have sudo NOPASSWD access to these apps: 
@@ -78,25 +79,25 @@
 #%
 #% EXAMPLES
 #%    Make an image of host mypi.local, compress it into a zip file at 
-#%    $HOME/mypi.local.zip:
+#%    $HOME/mypi.local_xGB.zip:
 #%
 #%      ${SCRIPT_NAME} pi@mypi.local
 #%
 #%    Make an image of host mypi.local, compress it into a zip file at 
-#%    $HOME/mypi.local.zip.  Use the SSH private key at $HOME/.ssh/id_rsa and 
+#%    $HOME/mypi.local_xGB.zip.  Use the SSH private key at $HOME/.ssh/id_rsa and 
 #%    Send log output to $HOME/mypi.log rather than /dev/stdout.
 #%
 #%      ${SCRIPT_NAME} -k $HOME/.ssh/id_rsa pi@mypi.local >$HOME/mypi.log 2>&1
 #%
 #%    Make an image of host mypi.local via an ssh connection to port 222, 
 #%    shrink the root partition and then compress it into a zip file and store it at
-#%    $HOME/mypi.zip.  Mail the script log to me@example.com:
+#%    $HOME/mypi_xGB.zip.  Mail the script log to me@example.com:
 #%
 #%      ${SCRIPT_NAME} -p 222 -n mypi -s -m me@example.com pi@mypi.local
 #%
 #================================================================
 #- IMPLEMENTATION
-#-    version         ${SCRIPT_NAME} 2.1.0
+#-    version         ${SCRIPT_NAME} 2.1.3
 #-    author          Steve Magnuson, AG7GN
 #-    license         CC-BY-SA Creative Commons License
 #-    script_id       0
@@ -172,7 +173,7 @@ function Die () {
 }
 
 function mailLog () {
-	SUBJECT="$NAME backup to $HOSTNAME status for $(date "+%A, %B %e %Y")"
+	SUBJECT="$NAME $DEVICE backup to $HOSTNAME status for $(date "+%A, %B %e %Y")"
 	MAIL_TYPE="${1^^}"
 	case $MAIL_TYPE in
 		PAT)
@@ -484,10 +485,10 @@ MICROSD_DEVICE="/dev/mmcblk0"
 DEVICE=${DEVICE:-$MICROSD_DEVICE}
 SHRINK=${SHRINK:-"FALSE"}
 RECIPIENTS=${RECIPIENTS:-}
-if [[ $DEVICE != $MICROSD_DEVICE && $SHRINK == "TRUE" ]]
-then  # Only shrink if we're using a micro SD card
-	SHRINK="FALSE"
-fi
+#if [[ $DEVICE != $MICROSD_DEVICE && $SHRINK == "TRUE" ]]
+#then  # Only shrink if we're using a micro SD card
+#	SHRINK="FALSE"
+#fi
 # Set the SENDER variable to your email address if you want results mailed using a
 # mail program on this host.  This variable is not used if you're using pat.
 SENDER="me@example.com"
@@ -524,10 +525,30 @@ $SYNTAX && set -n
 # Run in debug mode, if set
 $DEBUG && set -x 
 
+
+# SSH to the source (host to back up) and determine the size of the device.
+DEVICE_SIZE=$($SSH "sudo blockdev --getsize64 $DEVICE" 2>>$LOG)
+if [ -z "${DEVICE_SIZE//[0-9]}" ] && [ -n "$DEVICE_SIZE" ] && [ "$DEVICE_SIZE" -ge 0 ]
+then
+	echo >&2 "$(date): $DEVICE on $NAME is $(( $DEVICE_SIZE / 1000000000 )) GB" >> $LOG
+	# Disk space on target host (this host - where the backup will be stored)
+	AVAILABLE_SPACE=$(($(stat -f --format="%a*%S" $HOME)))
+	if (( $AVAILABLE_SPACE < $(( $DEVICE_SIZE * 2 )) ))
+	then
+		echo >&2 "$(date): At least $(( $DEVICE_SIZE * 2 )) Bytes are needed to backup ${NAME}'s $DEVICE. There is not enough disk space on this host. Backup FAILED" >> $LOG
+		exit 1
+	else
+		echo >&2 "$(date): This host has $(( $AVAILABLE_SPACE / 1000000000 )) GB available, which is enough to back up ${NAME}'s $DEVICE" >> $LOG
+	fi
+else
+	echo >&2 "$(date): Unable to determine size of $DEVICE on $NAME. Backup FAILED" >> $LOG
+	exit 1
+fi
+
 # SSH to source (host to back up), and start dd piped into gzip so we don't send so much traffic.
 # When the data stream is received on this host, use dd to capture it into a .gz file
-echo >&2 "$(date): Downloading compressed-on-the-fly dd image from $NAME via ssh into local file $GZIPIMAGE..." >> $LOG
-$SSH "sudo dd if=$DEVICE bs=1M 2>/dev/null | gzip - 2>/dev/null" 2>>$LOG | dd of=$GZIPIMAGE status=none 2>&1 >> $LOG
+echo >&2 "$(date): Downloading compressed-on-the-fly dd image of ${NAME}'s $DEVICE via ssh into local file $GZIPIMAGE..." >> $LOG
+$SSH "sudo dd if=$DEVICE bs=1M 2>/dev/null | pigz -p 2 - 2>/dev/null" 2>>$LOG | dd of=$GZIPIMAGE status=none 2>&1 >> $LOG
 (( $? == 0 )) && echo >&2 "$(date): Download complete." >> $LOG || { echo >&2 "$(date): FAILED." >> $LOG; exit 1; }
 
 # Check to see if we have an intact .gz file
@@ -536,8 +557,9 @@ then
 	if [[ $SHRINK == "FALSE" ]]
 	then  
 	   echo >&2 "$(date): Image will not be shrunk." >> $LOG
-	   mv $GZIPIMAGE $HOME/$NAME.gz
-		echo >&2 "$(date): $NAME image backup complete. Image is in $NAME.gz." >> $LOG
+	   DESTINATION_GZ="${NAME}_$(( $DEVICE_SIZE / 1000000000 ))GB.gz"
+	   mv -f $GZIPIMAGE $HOME/$DESTINATION_GZ
+		echo >&2 "$(date): $NAME image backup complete. Image is in $NAME_$(( $DEVICE_SIZE / 1000000000 ))GB.gz." >> $LOG
 		exit 0
 	else  # Decompress the .gz file in order to shrink root partition
 	    echo >&2 "$(date): Decompressing $GZIPIMAGE..." >> $LOG
@@ -558,11 +580,13 @@ Shrink >> $LOG 2>&1
 if (( $? == 0 ))
 then # Shrink was successful
 	# ZIP the shrunken image.  ZIP file can be burned directly to new SD card using Balena Etcher.
-	echo >&2 -n "$(date): Zipping image to $NAME.zip..." >> $LOG
-	[ -s $NAME.zip ] && rm $NAME.zip
-	$ZIP $NAME.zip $STOREDIMAGE >&2 >> $LOG
+	DESTINATION_ZIP="${NAME}_$(( $DEVICE_SIZE / 1000000000 ))GB.zip"
+	echo >&2 -n "$(date): Zipping image..." >> $LOG
+	#[ -s $DESTINATION_ZIP ] && rm $DESTINATION_ZIP
+	rm -f ${NAME}*.zip
+	$ZIP $DESTINATION_ZIP $STOREDIMAGE >&2 >> $LOG
 	(( $? == 0 )) && echo >&2 "OK" >> $LOG || { echo >&2 "FAILED" >> $LOG; exit 1; }
-	echo >&2 "$(date): $NAME image backup complete. Image is in $NAME.zip." >> $LOG
+	echo >&2 "$(date): $NAME image backup complete. Image is in $DESTINATION_ZIP." >> $LOG
 	rm -f $STOREDIMAGE
    exit 0
 else # Shrink failed.  Keep the unshrunk image and exit.
