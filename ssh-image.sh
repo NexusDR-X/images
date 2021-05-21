@@ -37,6 +37,10 @@
 #%    -d DEVICE, --device=DEVICE  The source device to back up. On Pis that boot from a 
 #%                                USB drive, this would be something like /dev/sda.
 #%                                Default: /dev/mmcblk0, which is the Pi's microSD card.
+#%    -s, --shrink                For the default device (/dev/mmcblk0) ONLY, 
+#%                                optionally shrink the root partition before ZIPing the
+#%                                image. This option is ignored if DEVICE is anything
+#%                                other than /dev/mmcblk0.
 #% 
 #% REQUIREMENTS
 #%    The remote host you are creating an image of (the source) must have the
@@ -48,11 +52,16 @@
 #%    be prompted to enter the passphrase. This script will automatically use 
 #%    $HOME/.keychain/$HOSTNAME-sh if it exists.
 #%
-#%    The destination host must have available disk space of twice
-#%    the size of the source's microSD card.  The majority of the needed disk
-#%    space is used during the shrinking and truncating process, and that disk
-#%    space is freed up when the script completes. The resulting ZIP file is
-#%    considerably smaller than the actual image.
+#%    If the shrink (-s, --shrink) option is specified AND the default device is 
+#%    /dev/mmcblk0 (the Pi's microSD card), then the destination host must have 
+#%    available disk space of twice the size of the source's microSD card.  
+#%    The majority of the needed disk space is used during the shrinking and 
+#%    truncating process, and that disk space is freed up when the script completes. 
+#%    The resulting ZIP file (.zip extension) is usually considerably smaller than the 
+#%    actual image.
+#%
+#%    If the shrink (-s, --shrink) option is not provided, the resulting file will be a
+#%    gzip file with a .gz extension.
 #%                 
 #%    This script should be run by a regular user, but the user or a group of 
 #%    which the user is a member must have sudo NOPASSWD access to these apps: 
@@ -80,14 +89,14 @@
 #%      ${SCRIPT_NAME} -k $HOME/.ssh/id_rsa pi@mypi.local >$HOME/mypi.log 2>&1
 #%
 #%    Make an image of host mypi.local via an ssh connection to port 222, 
-#%    compress it into a zip file and store it at $HOME/mypi.zip.  Mail the 
-#%    script log to me@example.com:
+#%    shrink the root partition and then compress it into a zip file and store it at
+#%    $HOME/mypi.zip.  Mail the script log to me@example.com:
 #%
-#%      ${SCRIPT_NAME} -p 222 -n mypi -m me@example.com pi@mypi.local
+#%      ${SCRIPT_NAME} -p 222 -n mypi -s -m me@example.com pi@mypi.local
 #%
 #================================================================
 #- IMPLEMENTATION
-#-    version         ${SCRIPT_NAME} 2.0.5
+#-    version         ${SCRIPT_NAME} 2.1.0
 #-    author          Steve Magnuson, AG7GN
 #-    license         CC-BY-SA Creative Commons License
 #-    script_id       0
@@ -97,6 +106,7 @@
 #     20200622 : Steve Magnuson : Script creation
 #     20210512 : Added "device" to enable backup of Pis that boot
 #                from a USB drive 
+#     20210520 : Added "shrink" option
 # 
 #================================================================
 #  DEBUG OPTION
@@ -356,7 +366,7 @@ TMPDIR="/tmp/${SCRIPT_NAME}.$RANDOM.$RANDOM.$RANDOM.$$"
 #============================
   
 #== set short options ==#
-SCRIPT_OPTS=':d:k:m:n:p:hv-:'
+SCRIPT_OPTS=':d:k:m:n:p:hsv-:'
 
 #== set long options associated with short one ==#
 typeset -A ARRAY_OPTS
@@ -368,6 +378,7 @@ ARRAY_OPTS=(
 	[mail]=m
 	[port]=p
 	[device]=d
+	[shrink]=s
 )
 
 LONG_OPTS="^($(echo "${!ARRAY_OPTS[@]}" | tr ' ' '|'))="
@@ -416,6 +427,9 @@ do
 			ScriptInfo version
 			exit 0
 			;;
+		s)
+		   SHRINK="TRUE"
+		   ;;
 		n)
 			NAME="$OPTARG"
 			;;
@@ -466,8 +480,14 @@ KEY=${KEY:-$HOME/.ssh/id_rsa}
 PORT=${PORT:-22}
 STOREDIMAGE="$HOME/$NAME.img"
 GZIPIMAGE="$HOME/$NAME-$(date "+%Y%m%dT%H%M").gz"
-DEVICE=${DEVICE:-/dev/mmcblk0}
+MICROSD_DEVICE="/dev/mmcblk0"
+DEVICE=${DEVICE:-$MICROSD_DEVICE}
+SHRINK=${SHRINK:-"FALSE"}
 RECIPIENTS=${RECIPIENTS:-}
+if [[ $DEVICE != $MICROSD_DEVICE && $SHRINK == "TRUE" ]]
+then  # Only shrink if we're using a micro SD card
+	SHRINK="FALSE"
+fi
 # Set the SENDER variable to your email address if you want results mailed using a
 # mail program on this host.  This variable is not used if you're using pat.
 SENDER="me@example.com"
@@ -512,10 +532,18 @@ $SSH "sudo dd if=$DEVICE bs=1M 2>/dev/null | gzip - 2>/dev/null" 2>>$LOG | dd of
 
 # Check to see if we have an intact .gz file
 if [ -s $GZIPIMAGE ]
-then # Decompress the .gz file
-	echo >&2 "$(date): Decompressing $GZIPIMAGE..." >> $LOG
-	$GZIP $GZIPIMAGE > $STOREDIMAGE
-	(( $? == 0 )) && echo >&2 -e "$(date): Decompressed OK.\n" >> $LOG || { echo >&2 "$(date): FAILED." >> $LOG; exit 1; }
+then  
+	if [[ $SHRINK == "FALSE" ]]
+	then  
+	   echo >&2 "$(date): Image will not be shrunk." >> $LOG
+	   mv $GZIPIMAGE $HOME/$NAME.gz
+		echo >&2 "$(date): $NAME image backup complete. Image is in $NAME.gz." >> $LOG
+		exit 0
+	else  # Decompress the .gz file in order to shrink root partition
+	    echo >&2 "$(date): Decompressing $GZIPIMAGE..." >> $LOG
+		$GZIP $GZIPIMAGE > $STOREDIMAGE
+		(( $? == 0 )) && echo >&2 -e "$(date): Decompressed OK.\n" >> $LOG || { echo >&2 "$(date): FAILED." >> $LOG; exit 1; }
+	fi
 else # Something went wrong during the ssh copy
 	echo >&2 "$(date): Compressed file $GZIPIMAGE does not exist or is empty" >> $LOG
 	exit 1
