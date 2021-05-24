@@ -97,7 +97,7 @@
 #%
 #================================================================
 #- IMPLEMENTATION
-#-    version         ${SCRIPT_NAME} 2.1.3
+#-    version         ${SCRIPT_NAME} 2.1.4
 #-    author          Steve Magnuson, AG7GN
 #-    license         CC-BY-SA Creative Commons License
 #-    script_id       0
@@ -530,12 +530,13 @@ $DEBUG && set -x
 DEVICE_SIZE=$($SSH "sudo blockdev --getsize64 $DEVICE" 2>>$LOG)
 if [ -z "${DEVICE_SIZE//[0-9]}" ] && [ -n "$DEVICE_SIZE" ] && [ "$DEVICE_SIZE" -ge 0 ]
 then
+	[[ $SHRINK == "TRUE" ]] && NEEDED_SPACE=$(( $DEVICE_SIZE * 2 )) || NEEDED_SPACE=$DEVICE_SIZE
 	echo >&2 "$(date): $DEVICE on $NAME is $(( $DEVICE_SIZE / 1000000000 )) GB" >> $LOG
 	# Disk space on target host (this host - where the backup will be stored)
 	AVAILABLE_SPACE=$(($(stat -f --format="%a*%S" $HOME)))
-	if (( $AVAILABLE_SPACE < $(( $DEVICE_SIZE * 2 )) ))
+	if (( $AVAILABLE_SPACE < $NEEDED_SPACE ))
 	then
-		echo >&2 "$(date): At least $(( $DEVICE_SIZE * 2 )) Bytes are needed to backup ${NAME}'s $DEVICE. There is not enough disk space on this host. Backup FAILED" >> $LOG
+		echo >&2 "$(date): At least $NEEDED_SPACE Bytes are needed to backup ${NAME}'s $DEVICE. There is not enough disk space on this host. Backup FAILED" >> $LOG
 		exit 1
 	else
 		echo >&2 "$(date): This host has $(( $AVAILABLE_SPACE / 1000000000 )) GB available, which is enough to back up ${NAME}'s $DEVICE" >> $LOG
