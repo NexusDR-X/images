@@ -566,7 +566,7 @@ else
 fi
 
 # Run pre-imaging scripts on HOST
-if [[ -z $PRE_SCRIPTS ]]
+if [[ ! -z $PRE_SCRIPTS ]]
 then
 	$SSH "$PRE_SCRIPTS" 2>&1 >> $LOG
 	RESULT=$?
@@ -580,7 +580,7 @@ $SSH "sudo dd if=$DEVICE bs=1M 2>/dev/null | pigz -p 2 - 2>/dev/null" 2>>$LOG | 
 (( $? == 0 )) && echo >&2 "$(date): Download complete." >> $LOG || { echo >&2 "$(date): FAILED." >> $LOG; exit 1; }
 
 # Run post-imaging scripts on HOST
-if [[ -z $POST_SCRIPTS ]]
+if [[ ! -z $POST_SCRIPTS ]]
 then
 	$SSH "$POST_SCRIPTS" 2>&1 >> $LOG
 	RESULT=$?
