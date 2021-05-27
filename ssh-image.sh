@@ -224,6 +224,23 @@ function fixOrphans () {
    return 0
 }
 
+function RunScripts () {
+
+	if [[ ! -z "$1" ]]
+	then
+		echo >&2 "$(date): Running \"$1\" on $HOST." >> $LOG
+		SCRIPT_RESULTS="$($SSH "$1" 2>>$LOG)"
+		RESULT=$?
+		echo >&2 "$SCRIPT_RESULTS" >> $LOG
+		echo >&2 "$(date): Finished running \"$1\" on $HOST." >> $LOG
+		if (( $RESULT != 0 ))
+		then
+			echo >&2 "$(date): ERROR! \"$1\" returned non-zero exit code. Backup FAILED." >> $LOG
+			exit 1
+		fi
+	fi
+}
+
 function Shrink() {
 
 	#Usage checks
@@ -566,30 +583,16 @@ else
 fi
 
 # Run pre-imaging scripts on HOST
-if [[ ! -z $PRE_SCRIPTS ]]
-then
-   echo >&2 "$(date): Running \"$PRE_SCRIPTS\" on $HOST." >> $LOG
-	$SSH "$PRE_SCRIPTS" 2>&1 >> $LOG
-	RESULT=$?
-   echo >&2 "$(date): Finished running \"$PRE_SCRIPTS\" on $HOST." >> $LOG
-	(( $RESULT != 0 )) && echo >&2 "$(date): WARNING \"$PRE_SCRIPTS\" returned non-zero exit code." >> $LOG
-fi
+RunScripts "$PRE_SCRIPTS"
 
 # SSH to source (host to back up), and start dd piped into gzip so we don't send so much traffic.
 # When the data stream is received on this host, use dd to capture it into a .gz file
 echo >&2 "$(date): Downloading compressed-on-the-fly dd image of ${NAME}'s $DEVICE via ssh into local file $GZIPIMAGE..." >> $LOG
 $SSH "sudo dd if=$DEVICE bs=1M 2>/dev/null | pigz -p 2 - 2>/dev/null" 2>>$LOG | dd of=$GZIPIMAGE status=none 2>&1 >> $LOG
-(( $? == 0 )) && echo >&2 "$(date): Download complete." >> $LOG || { echo >&2 "$(date): FAILED." >> $LOG; exit 1; }
+(( $? == 0 )) && echo >&2 "$(date): Download complete." >> $LOG || { echo >&2 "$(date): FAILED." >> $LOG; RunScripts "$POST_SCRIPTS"; exit 1; }
 
 # Run post-imaging scripts on HOST
-if [[ ! -z $POST_SCRIPTS ]]
-then
-   echo >&2 "$(date): Running \"$POST_SCRIPTS\" on $HOST." >> $LOG
-	$SSH "$POST_SCRIPTS" 2>&1 >> $LOG
-	RESULT=$?
-   echo >&2 "$(date): Finished running \"$POST_SCRIPTS\" on $HOST." >> $LOG
-	(( $RESULT != 0 )) && echo >&2 "$(date): WARNING \"$POST_SCRIPTS\" returned non-zero exit code." >> $LOG
-fi
+RunScripts "$POST_SCRIPTS"
 
 # Check to see if we have an intact .gz file
 if [ -s $GZIPIMAGE ]
