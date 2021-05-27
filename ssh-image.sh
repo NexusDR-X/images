@@ -226,12 +226,13 @@ function fixOrphans () {
 
 function RunScripts () {
 
-	if [[ ! -z "$1" ]]
+	if [[ -z "$1" ]]
 	then
+		return
+	else
 		echo >&2 "$(date): Running \"$1\" on $HOST." >> $LOG
-		SCRIPT_RESULTS="$($SSH "$1" 2>>$LOG)"
+		$SSH "$1" 2>&1 >>$LOG
 		RESULT=$?
-		echo >&2 "$SCRIPT_RESULTS" >> $LOG
 		echo >&2 "$(date): Finished running \"$1\" on $HOST." >> $LOG
 		if (( $RESULT != 0 ))
 		then
