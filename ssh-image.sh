@@ -38,7 +38,13 @@
 #%                                USB drive, this would be something like /dev/sda.
 #%                                Default: /dev/mmcblk0, which is the Pi's microSD card.
 #%    -s, --shrink                Optionally shrink the root partition before ZIPing the
-#%                                image. 
+#%                                image.
+#%    -b, --before                Optional commands to run on HOST prior to starting the
+#%                                imaging process. Separate commands by semicolon (;)
+#%                                and wrap entire list of commands in quotes.
+#%    -a, --after                 Optional commands to run on HOST after finishing the
+#%                                imaging process. Separate commands by semicolon (;)
+#%                                and wrap entire list of commands in quotes.
 #% 
 #% REQUIREMENTS
 #%    The remote host you are creating an image of (the source) must have the
@@ -49,6 +55,10 @@
 #%    (example: https://www.funtoo.org/Keychain) so the destination will not 
 #%    be prompted to enter the passphrase. This script will automatically use 
 #%    $HOME/.keychain/$HOSTNAME-sh if it exists.
+#%
+#%    You can optionally issue commands to stop certain services or scripts on HOST
+#%    prior to starting the imaging process. Likewise, you can restart those services
+#%    or scripts after the image process completes.
 #%
 #%    If the shrink (-s, --shrink) option is specified, the destination host must 
 #%    have available disk space of twice the size of the source's microSD card.  
@@ -97,7 +107,7 @@
 #%
 #================================================================
 #- IMPLEMENTATION
-#-    version         ${SCRIPT_NAME} 2.1.4
+#-    version         ${SCRIPT_NAME} 2.1.5
 #-    author          Steve Magnuson, AG7GN
 #-    license         CC-BY-SA Creative Commons License
 #-    script_id       0
@@ -361,13 +371,12 @@ TMPDIR="/tmp/${SCRIPT_NAME}.$RANDOM.$RANDOM.$RANDOM.$$"
   Die "Could not create temporary directory! Exiting."
 }
 
-
 #============================
 #  PARSE OPTIONS WITH GETOPTS
 #============================
   
 #== set short options ==#
-SCRIPT_OPTS=':d:k:m:n:p:hsv-:'
+SCRIPT_OPTS=':d:k:m:n:p:a:b:hsv-:'
 
 #== set long options associated with short one ==#
 typeset -A ARRAY_OPTS
@@ -380,6 +389,8 @@ ARRAY_OPTS=(
 	[port]=p
 	[device]=d
 	[shrink]=s
+	[after]=a
+	[before]=b
 )
 
 LONG_OPTS="^($(echo "${!ARRAY_OPTS[@]}" | tr ' ' '|'))="
@@ -446,6 +457,12 @@ do
 		d)
 			DEVICE="$OPTARG"
 			;;
+		a)
+			POST_SCRIPTS="$OPTARG"
+			;;
+		b)
+			PRE_SCRIPTS="$OPTARG"
+			;;
 		:) 
 			Die "${SCRIPT_NAME}: -$OPTARG: option requires an argument"
 			;;
@@ -484,6 +501,8 @@ GZIPIMAGE="$HOME/$NAME-$(date "+%Y%m%dT%H%M").gz"
 MICROSD_DEVICE="/dev/mmcblk0"
 DEVICE=${DEVICE:-$MICROSD_DEVICE}
 SHRINK=${SHRINK:-"FALSE"}
+PRE_SCRIPTS=${PRE_SCRIPTS:-""}
+POST_SCRIPTS=${POST_SCRIPTS:-""}
 RECIPIENTS=${RECIPIENTS:-}
 #if [[ $DEVICE != $MICROSD_DEVICE && $SHRINK == "TRUE" ]]
 #then  # Only shrink if we're using a micro SD card
@@ -546,11 +565,27 @@ else
 	exit 1
 fi
 
+# Run pre-imaging scripts on HOST
+if [[ -z $PRE_SCRIPTS ]]
+then
+	$SSH "$PRE_SCRIPTS" 2>&1 >> $LOG
+	RESULT=$?
+	(( $RESULT != 0 )) && echo >&2 "$(date): WARNING \"$PRE_SCRIPTS\" returned non-zero exit code." >> $LOG
+fi
+
 # SSH to source (host to back up), and start dd piped into gzip so we don't send so much traffic.
 # When the data stream is received on this host, use dd to capture it into a .gz file
 echo >&2 "$(date): Downloading compressed-on-the-fly dd image of ${NAME}'s $DEVICE via ssh into local file $GZIPIMAGE..." >> $LOG
 $SSH "sudo dd if=$DEVICE bs=1M 2>/dev/null | pigz -p 2 - 2>/dev/null" 2>>$LOG | dd of=$GZIPIMAGE status=none 2>&1 >> $LOG
 (( $? == 0 )) && echo >&2 "$(date): Download complete." >> $LOG || { echo >&2 "$(date): FAILED." >> $LOG; exit 1; }
+
+# Run post-imaging scripts on HOST
+if [[ -z $POST_SCRIPTS ]]
+then
+	$SSH "$POST_SCRIPTS" 2>&1 >> $LOG
+	RESULT=$?
+	(( $RESULT != 0 )) && echo >&2 "$(date): WARNING \"$POST_SCRIPTS\" returned non-zero exit code." >> $LOG
+fi
 
 # Check to see if we have an intact .gz file
 if [ -s $GZIPIMAGE ]
