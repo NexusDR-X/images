@@ -568,8 +568,10 @@ fi
 # Run pre-imaging scripts on HOST
 if [[ ! -z $PRE_SCRIPTS ]]
 then
+   echo >&2 "$(date): Running \"$PRE_SCRIPTS\" on $HOST." >> $LOG
 	$SSH "$PRE_SCRIPTS" 2>&1 >> $LOG
 	RESULT=$?
+   echo >&2 "$(date): Finished running \"$PRE_SCRIPTS\" on $HOST." >> $LOG
 	(( $RESULT != 0 )) && echo >&2 "$(date): WARNING \"$PRE_SCRIPTS\" returned non-zero exit code." >> $LOG
 fi
 
@@ -582,8 +584,10 @@ $SSH "sudo dd if=$DEVICE bs=1M 2>/dev/null | pigz -p 2 - 2>/dev/null" 2>>$LOG | 
 # Run post-imaging scripts on HOST
 if [[ ! -z $POST_SCRIPTS ]]
 then
+   echo >&2 "$(date): Running \"$POST_SCRIPTS\" on $HOST." >> $LOG
 	$SSH "$POST_SCRIPTS" 2>&1 >> $LOG
 	RESULT=$?
+   echo >&2 "$(date): Finished running \"$POST_SCRIPTS\" on $HOST." >> $LOG
 	(( $RESULT != 0 )) && echo >&2 "$(date): WARNING \"$POST_SCRIPTS\" returned non-zero exit code." >> $LOG
 fi
 
