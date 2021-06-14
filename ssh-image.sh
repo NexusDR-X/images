@@ -107,7 +107,7 @@
 #%
 #================================================================
 #- IMPLEMENTATION
-#-    version         ${SCRIPT_NAME} 2.1.5
+#-    version         ${SCRIPT_NAME} 2.1.6
 #-    author          Steve Magnuson, AG7GN
 #-    license         CC-BY-SA Creative Commons License
 #-    script_id       0
@@ -603,7 +603,7 @@ then
 	   echo >&2 "$(date): Image will not be shrunk." >> $LOG
 	   DESTINATION_GZ="${NAME}_$(( $DEVICE_SIZE / 1000000000 ))GB.gz"
 	   mv -f $GZIPIMAGE $HOME/$DESTINATION_GZ
-		echo >&2 "$(date): $NAME image backup complete. Image is in $NAME_$(( $DEVICE_SIZE / 1000000000 ))GB.gz." >> $LOG
+		echo >&2 "$(date): $NAME image backup complete. Image is in ${NAME}_$(( $DEVICE_SIZE / 1000000000 ))GB.gz." >> $LOG
 		exit 0
 	else  # Decompress the .gz file in order to shrink root partition
 	    echo >&2 "$(date): Decompressing $GZIPIMAGE..." >> $LOG
